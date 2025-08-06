@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/go-playground/form/v4"
-	"honnef.co/go/tools/go/ir"
 )
 
 func (app *application) serveError(w http.ResponseWriter, r *http.Request, err error) {
@@ -49,6 +48,7 @@ func (app *application) render(w http.ResponseWriter, r *http.Request, status in
 func (app *application) newTemplateData(r *http.Request) templateData {
 	return templateData{
 		CurrentYear: time.Now().Year(),
+		Flash:       app.sessionManager.PopString(r.Context(), "flash"),
 	}
 }
 
