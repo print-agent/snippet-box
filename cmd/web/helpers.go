@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/go-playground/form/v4"
-	"honnef.co/go/tools/go/ir"
 )
 
 func (app *application) serveError(w http.ResponseWriter, r *http.Request, err error) {
