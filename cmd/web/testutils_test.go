@@ -2,11 +2,14 @@ package main
 
 import (
 	"bytes"
+	"html"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
+	"regexp"
 	"testing"
 	"time"
 
@@ -14,6 +17,17 @@ import (
 	"github.com/go-playground/form/v4"
 	"github.com/print-agent/snippet-box/internal/models/mocks"
 )
+
+var csrfTokenRX = regexp.MustCompile(`<input type="hidden" name="csrf_token" value="(.+)" />`)
+
+func extractCSRFToken(t *testing.T, body string) string {
+	matches := csrfTokenRX.FindStringSubmatch(body)
+	if len(matches) < 2 {
+		t.Fatal("no csrf token found in body")
+	}
+
+	return html.UnescapeString(matches[1])
+}
 
 func newTestApplication(t *testing.T) *application {
 	templateCache, err := newTemplateCache()
@@ -29,8 +43,8 @@ func newTestApplication(t *testing.T) *application {
 
 	return &application{
 		logger:         slog.New(slog.DiscardHandler),
-		snippets:       &mocks.SnippetModel{}, // Use the mock.
-		users:          &mocks.UserModel{},    // Use the mock.
+		snippets:       &mocks.SnippetModel{},
+		users:          &mocks.UserModel{},
 		templateCache:  templateCache,
 		formDecoder:    formDecoder,
 		sessionManager: sessionManager,
@@ -60,6 +74,22 @@ func newTestServer(t *testing.T, h http.Handler) *testServer {
 
 func (ts *testServer) get(t *testing.T, urlPath string) (int, http.Header, string) {
 	rs, err := ts.Client().Get(ts.URL + urlPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer rs.Body.Close()
+	body, err := io.ReadAll(rs.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body = bytes.TrimSpace(body)
+
+	return rs.StatusCode, rs.Header, string(body)
+}
+
+func (ts *testServer) postForm(t *testing.T, urlPath string, form url.Values) (int, http.Header, string) {
+	rs, err := ts.Client().PostForm(ts.URL+urlPath, form)
 	if err != nil {
 		t.Fatal(err)
 	}
